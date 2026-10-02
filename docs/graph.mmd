@@ -1,0 +1,36 @@
+---
+config:
+  flowchart:
+    curve: linear
+---
+graph TD;
+	__start__([<p>__start__</p>]):::first
+	planner(planner)
+	executor(executor)
+	tool_node(tool_node)
+	synthesizer(synthesizer)
+	critic(critic)
+	revise(revise)
+	direct_answer(direct_answer)
+	clarify(clarify)
+	unsupported(unsupported)
+	__end__([<p>__end__</p>]):::last
+	__start__ --> planner;
+	critic -. &nbsp;done&nbsp; .-> __end__;
+	critic -.-> revise;
+	executor -. &nbsp;synthesize&nbsp; .-> synthesizer;
+	executor -. &nbsp;tools&nbsp; .-> tool_node;
+	planner -.-> clarify;
+	planner -. &nbsp;direct&nbsp; .-> direct_answer;
+	planner -. &nbsp;tools&nbsp; .-> executor;
+	planner -.-> unsupported;
+	revise --> critic;
+	synthesizer --> critic;
+	tool_node --> executor;
+	clarify --> __end__;
+	direct_answer --> __end__;
+	unsupported --> __end__;
+	classDef default fill:#f2f0ff,line-height:1.2
+	classDef first fill-opacity:0
+	classDef last fill:#bfb6fc
+

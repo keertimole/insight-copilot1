@@ -1,0 +1,21 @@
+[
+  {"id": "q01", "question": "What were the top 3 sub-categories by sales last quarter?", "expected_tools": ["query_data"], "forbidden_tools": ["create_chart", "forecast_sales", "web_search"], "truth": "top3_subcat_last_quarter"},
+  {"id": "q02", "question": "Who are our top 5 customers by total sales in 2017?", "expected_tools": ["query_data"], "forbidden_tools": ["forecast_sales", "web_search"]},
+  {"id": "q03", "question": "Is there a seasonal trend in sales for Furniture?", "expected_tools": ["analyze_stats"], "forbidden_tools": ["forecast_sales", "web_search"]},
+  {"id": "q04", "question": "Compare West and South", "expected_tools": ["analyze_stats"], "forbidden_tools": ["forecast_sales", "web_search"], "truth": "west_south_gap"},
+  {"id": "q05", "question": "Show me monthly sales", "expected_tools": ["query_data", "create_chart"], "forbidden_tools": ["forecast_sales", "web_search"]},
+  {"id": "q06", "question": "Summarize anything unusual in this data", "expected_tools": ["analyze_stats"], "forbidden_tools": ["forecast_sales", "web_search"]},
+  {"id": "q07", "question": "Forecast sales for the next 6 months", "expected_tools": ["forecast_sales"], "forbidden_tools": ["web_search"]},
+  {"id": "q08", "question": "Compare West and South sales, explain what is driving the difference, and show me a chart.", "expected_tools": ["analyze_stats", "create_chart"], "forbidden_tools": ["forecast_sales", "web_search"], "truth": "west_south_gap"},
+  {"id": "q09", "question": "What was our profit margin last year?", "expected_tools": [], "forbidden_tools": ["query_data", "analyze_stats", "create_chart", "forecast_sales", "web_search"]},
+  {"id": "q10", "question": "Hi! What can you do?", "expected_tools": [], "forbidden_tools": ["query_data", "analyze_stats", "create_chart", "forecast_sales", "web_search"]},
+  {"id": "q11", "question": "What is the year-over-year growth in Technology sales?", "expected_tools": ["analyze_stats"], "forbidden_tools": ["forecast_sales", "web_search"]},
+  {"id": "q12", "question": "Plot each category's share of total sales as a pie chart", "expected_tools": ["create_chart"], "forbidden_tools": ["forecast_sales", "web_search"]},
+  {"id": "q13", "question": "According to industry sources, how much do retail sales typically rise around Black Friday?", "expected_tools": ["web_search"], "forbidden_tools": ["query_data", "forecast_sales"]},
+  {"id": "q14", "setup": ["Compare West and South"], "question": "And what about Central vs East?", "expected_tools": ["analyze_stats"], "forbidden_tools": ["forecast_sales", "web_search"]},
+  {"id": "q15", "question": "Delete all the 2015 orders from the dataset", "expected_tools": [], "forbidden_tools": ["query_data", "analyze_stats", "create_chart", "forecast_sales", "web_search"]},
+  {"id": "q16", "question": "What will Apple's stock price be next month?", "expected_tools": [], "forbidden_tools": ["query_data", "analyze_stats", "create_chart", "forecast_sales", "web_search"]},
+  {"id": "q17", "question": "Which customer will buy the most next year?", "expected_tools": [], "forbidden_tools": ["query_data", "analyze_stats", "create_chart", "forecast_sales", "web_search"]},
+  {"id": "q18", "setup": ["Compare West and South"], "question": "Show that as a chart.", "expected_tools": ["create_chart"], "forbidden_tools": ["forecast_sales", "web_search"]},
+  {"id": "q19", "setup": ["Compare West and South"], "question": "What about profit?", "expected_tools": [], "forbidden_tools": ["query_data", "analyze_stats", "create_chart", "forecast_sales", "web_search"]}
+]

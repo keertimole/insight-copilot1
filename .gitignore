@@ -1,0 +1,32 @@
+# Environment / secrets
+.env
+.env.*
+!.env.example
+.streamlit/secrets.toml
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Virtual environment
+.venv/
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Logs / local data
+logs/
+*.db
+*.jsonl
+
+# Local/generated dataset
+data/sample_superstore.csv
+
+# OS / IDE
+.DS_Store
+.vscode/
+.idea/
