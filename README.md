@@ -5,7 +5,7 @@ A **reasoning, tool-using analytics chatbot** built on **LangGraph**. Ask questi
 English; the agent plans, picks the right tool(s), and answers like an analyst - *answer, supporting numbers, why it matters* -
 with the full reasoning trace one click away.
 
-> **Live demo:** `<your-streamlit-url>` &nbsp;·&nbsp; free-tier apps sleep when idle - the first load can take ~30 s, that is not a crash.
+> **Live demo:** https://insight-copilot1-ijz7gvpbq3cekpqbbh5sln.streamlit.app/ &nbsp;·&nbsp; free-tier apps sleep when idle - the first load can take ~30 s, that is not a crash.
 
 ---
 
@@ -91,7 +91,7 @@ python scripts/cli.py "Compare West and South and explain the gap"
 
 ### 4. Deploy (Streamlit Community Cloud - free)
 1. Push this repo to GitHub (public, or private + add the reviewers as collaborators). **Do not commit `.env` or `secrets.toml`** (both are git-ignored).
-2. https://insight-copilot1-ijz7gvpbq3cekpqbbh5sln.streamlit.app/ Open Streamlit Community Cloud → *New app* → pick the repo, branch `main`, main file `app.py`.
+2. Open Streamlit Community Cloud → *New app* → pick the repo, branch `main`, main file `app.py`.
 3. *Advanced settings → Secrets*, paste:
    ```toml
    GROQ_API_KEY = "your_key_here"
