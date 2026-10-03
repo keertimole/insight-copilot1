@@ -101,7 +101,8 @@ def _time_context() -> str:
 def _friendly_error(e: Exception) -> str:
     """Short, user-safe description of an LLM/API failure (no org ids or raw payloads)."""
     name, msg = type(e).__name__, str(e)
-    if "rate" in name.lower() or "429" in msg or "rate limit" in msg.lower():
+    if ("rate" in name.lower() or "429" in msg or "rate limit" in msg.lower()
+            or "ratelimit" in msg.lower()):
         return ("the model provider's rate limit was reached (free tiers have per-minute and per-day token caps). "
                 "Wait a few minutes, or set a different LLM_MODEL / LLM_PROVIDER")
     if "auth" in name.lower() or "401" in msg or "api key" in msg.lower():
@@ -299,6 +300,33 @@ def _invoke_with_retry(llm, convo, attempts=2):
     return AIMessage(content=""), f"{type(last).__name__}: {last}"
 
 
+_FORECAST_RE = re.compile(r"\b(forecast|predict|projection|project)\w*\b", re.I)
+_REGIONS = ("West", "East", "Central", "South")
+_CATEGORIES = ("Furniture", "Office Supplies", "Technology")
+_SEGMENTS = ("Consumer", "Corporate", "Home Office")
+
+
+def _offline_forecast_args(question: str) -> dict | None:
+    """When the LLM is unavailable, a clear 'forecast sales ...' request can still be served: no model is needed to
+    pick forecast_sales or to read the horizon / region / category / segment out of the question."""
+    if not _FORECAST_RE.search(question or "") or not re.search(r"\bsales?\b|\brevenue\b", question, re.I):
+        return None
+    m = re.search(r"(\d+)\s*(month|quarter|year)", question, re.I)
+    horizon = 6
+    if m:
+        horizon = int(m.group(1)) * {"month": 1, "quarter": 3, "year": 12}[m.group(2).lower()]
+    elif re.search(r"next\s+quarter", question, re.I):
+        horizon = 3
+    elif re.search(r"next\s+year", question, re.I):
+        horizon = 12
+    args = {"horizon_months": max(1, min(horizon, 24))}
+    for key, values in (("region", _REGIONS), ("category", _CATEGORIES), ("segment", _SEGMENTS)):
+        hit = next((v for v in values if re.search(rf"\b{re.escape(v)}\b", question, re.I)), None)
+        if hit:
+            args[key] = hit
+    return args
+
+
 def executor(state: AgentState) -> dict:
     """LLM (with tools bound) decides the next tool call(s) - or DONE. Records its 'thought' in the trace."""
     plan, msgs = state["plan"], state["messages"]
@@ -310,12 +338,25 @@ def executor(state: AgentState) -> dict:
     # Falls back to all tools if the plan named none (e.g. planner outage). Disable: ENFORCE_PLANNED_TOOLS=0.
     planned = [TOOLS_BY_NAME[t] for t in plan.get("tools", []) if t in TOOLS_BY_NAME]
     enforce = str(secret("ENFORCE_PLANNED_TOOLS", "1")).lower() not in ("0", "false", "no", "off")
+    obs_now = state.get("observations") or []
+    forecast_only = (obs_now and set(plan.get("tools") or []) <= {"forecast_sales"}
+                     and obs_now[-1]["tool"] == "forecast_sales" and not obs_now[-1]["output"].startswith("ERROR"))
+    if forecast_only or (obs_now and any(e.get("offline") for e in state.get("trace", []))):
+        # a forecast-only plan is complete once the tool ran: skip the extra executor call (saves tokens, avoids rate limits)
+        return {"steps": state.get("steps", 0) + 1,
+                "trace": state.get("trace", []) + [{"kind": "thought", "text": "I have enough information - writing the answer."}]}
     llm = get_llm(0.0).bind_tools(planned if (enforce and planned) else ALL_TOOLS)
     resp, error = _invoke_with_retry(llm, convo)
+    offline_args = None
+    if error and not state.get("observations"):         # LLM outage: a clear forecast request needs no model to route
+        offline_args = _offline_forecast_args(_text(msgs[-1].content))
+        if offline_args:
+            resp = AIMessage(content="", tool_calls=[{"name": "forecast_sales", "args": offline_args,
+                                                      "id": "offline-forecast", "type": "tool_call"}])
     if not error and not resp.tool_calls and not state.get("observations"):   # must gather data at least once
         resp, error = _invoke_with_retry(llm, convo + [AIMessage(content=_text(resp.content) or "DONE"), HumanMessage(
             content="You have not called any tool yet. Call the tool(s) needed to answer the question.")])
-    calls = [] if error else (resp.tool_calls or [])
+    calls = resp.tool_calls if offline_args else ([] if error else (resp.tool_calls or []))
     thought = _text(resp.content).strip()
     if thought.upper().startswith("DONE"):
         thought = ""
@@ -328,7 +369,12 @@ def executor(state: AgentState) -> dict:
         text = "The model call failed - I'll answer with what I have."
     else:
         text = "I have enough information - writing the answer."
+    if offline_args:
+        text = ("The model is unavailable, but this is clearly a sales-forecast request, so I'm running forecast_sales "
+                f"directly (horizon {offline_args['horizon_months']} months).")
     entry = {"kind": "thought", "text": text}
+    if offline_args:
+        entry["offline"] = True
     if error:
         entry["llm_error"] = error[:300]          # lets the eval runner tell provider outages from agent mistakes
     update = {"steps": state.get("steps", 0) + 1, "trace": state.get("trace", []) + [entry]}
@@ -387,19 +433,82 @@ def _observation_block(state: AgentState) -> str:
                         for i, o in enumerate(state.get("observations", []), 1)) or "(no tool observations)"
 
 
+def _forecast_answer(state: AgentState) -> str | None:
+    """Deterministic 3-part answer for a successful forecast_sales result (no extra LLM call, so a rate limit
+    cannot discard a forecast that was already computed). Returns None when there is no usable forecast."""
+    obs = next((o for o in reversed(state.get("observations", []))
+                if o.get("tool") == "forecast_sales" and not str(o.get("output", "")).startswith("ERROR")), None)
+    if not obs:
+        return None
+    try:
+        data = json.loads(obs.get("output", "{}"))
+    except Exception:  # noqa: BLE001 - truncated/invalid JSON: let the LLM synthesizer handle it
+        return None
+    rows = data.get("forecast") if isinstance(data, dict) else None
+    if not rows:
+        return None
+
+    filters = data.get("filters_applied") or {}
+    scope = (" for " + ", ".join(f"{k.replace('_', ' ')}: {v}" for k, v in filters.items())) if filters else ""
+    lines = [f"**Answer:** The sales forecast{scope} covers {data.get('forecast_period', 'the requested horizon')}, "
+             f"following the latest month in the dataset ({data.get('history_ends', 'n/a')})."
+             + (f" Total forecast: ${data['forecast_total']:,.2f}." if data.get("forecast_total") is not None else ""),
+             "", "**Supporting numbers:**"]
+    if data.get("method"):
+        lines.append(f"- Method: {data['method']}")
+    if data.get("training_months") is not None:
+        lines.append(f"- Training history: {data['training_months']} months")
+    if data.get("pct_vs_prior_year") is not None:
+        lines.append(f"- Versus the same months a year earlier: {data['pct_vs_prior_year']}%")
+    if data.get("backtest_mape_pct_last_6_months") is not None:
+        lines.append(f"- Backtest MAPE (last 6 months): {data['backtest_mape_pct_last_6_months']}%")
+    if data.get("baseline_seasonal_naive_mape_pct") is not None:
+        lines.append(f"- Seasonal-naive baseline MAPE: {data['baseline_seasonal_naive_mape_pct']}%")
+    if data.get("beats_seasonal_naive_baseline") is not None:
+        lines.append("- The model " + ("beat" if data["beats_seasonal_naive_baseline"] else "did not beat")
+                     + " the seasonal-naive baseline in the backtest.")
+    if state.get("charts"):                     # the critic requires an answer to mention a chart it was given
+        lines += ["", "The chart below shows the monthly sales history together with this forecast."]
+    lines += ["", "| Month | Forecast sales |", "|---|---:|"]
+    lines += [f"| {r.get('month', '')} | ${r['forecast_sales']:,.2f} |" for r in rows if r.get("forecast_sales") is not None]
+    lines += ["", "**Why it matters:** This is a statistical estimate extrapolated from the dataset's own history "
+                  "(not a real-world prediction), so treat it as a planning baseline rather than a guarantee."]
+    if data.get("caveat"):
+        lines += ["", f"_{data['caveat']}_"]
+    return "\n".join(lines)
+
+
 def synthesizer(state: AgentState) -> dict:
-    """Turns tool observations into a DRAFT analyst-style insight; the critic verifies it before it is shown."""
+    """Turns tool observations into a DRAFT analyst-style insight; the critic verifies it before it is shown.
+    A successful forecast is formatted deterministically (saves an LLM call and survives provider outages)."""
     msgs = state["messages"]
+    direct = _forecast_answer(state)
+    if direct:
+        return {"draft": direct, "draft_ok": True,
+                "trace": state.get("trace", []) + [{"kind": "thought",
+                         "text": "The forecast was computed by the tool - presenting its verified result directly."}]}
+    if state.get("route", "tools") == "tools" and not state.get("observations"):
+        # No tool ran, so there is nothing to report. Letting the LLM write anyway made it claim "the dataset has no data".
+        errs = [e["llm_error"] for e in state.get("trace", []) if e.get("llm_error")]
+        why = _friendly_error(RuntimeError(errs[-1])) if errs else "no analysis tool could be run for this question"
+        return {"draft": f"⚠️ I couldn't run the analysis: {why}. No data was retrieved, so I won't guess - "
+                         "please try again in a few minutes.", "draft_ok": False}
     charts = f"\nCharts created for the user: {len(state.get('charts', []))}" if state.get("charts") else ""
     try:
         resp = get_llm(0.2).invoke([
             SystemMessage(content=synthesizer_prompt()),
             HumanMessage(content=f"Conversation so far:\n{_history(msgs[:-1])}\n\nQuestion: {_text(msgs[-1].content)}\n\n"
                                  f"Plan: {state['plan'].get('reasoning', '')}\n\nTOOL OBSERVATIONS\n{_observation_block(state)}{charts}")])
-        return {"draft": _text(resp.content).strip(), "draft_ok": True}
+        draft = _text(resp.content).strip()
+        if draft:
+            return {"draft": draft, "draft_ok": True}
+        return {"draft": "The analysis completed, but the model returned no written response. Please try again.",
+                "draft_ok": False}
     except Exception as e:  # noqa: BLE001
         text = f"⚠️ I couldn't produce an answer: {_friendly_error(e)}. Please try again."
-        return {"draft": text, "draft_ok": False}
+        return {"draft": text, "draft_ok": False,
+                "trace": state.get("trace", []) + [{"kind": "thought", "text": "Final answer synthesis was unavailable.",
+                                                     "llm_error": f"{type(e).__name__}: {str(e)[:300]}"}]}
 
 
 def critic(state: AgentState) -> dict:
