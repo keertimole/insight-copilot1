@@ -35,7 +35,25 @@ st.set_page_config(
     page_icon="📊",
     layout="wide",
 )
+st.markdown(
+    """
+    <style>
+    [data-testid="stChatInput"] {
+        position: fixed !important;
+        bottom: 1rem !important;
+        left: 50% !important;
+        transform: translateX(-50%) !important;
+        width: min(900px, calc(100vw - 2rem)) !important;
+        z-index: 999999 !important;
+    }
 
+    .main .block-container {
+        padding-bottom: 7rem !important;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
 
 HERO = (
     "Compare West and South sales, explain what is driving "
