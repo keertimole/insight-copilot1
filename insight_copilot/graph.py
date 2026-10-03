@@ -482,33 +482,91 @@ def synthesizer(state: AgentState) -> dict:
     """Turns tool observations into a DRAFT analyst-style insight; the critic verifies it before it is shown.
     A successful forecast is formatted deterministically (saves an LLM call and survives provider outages)."""
     msgs = state["messages"]
+
     direct = _forecast_answer(state)
+
     if direct:
-        return {"draft": direct, "draft_ok": True,
-                "trace": state.get("trace", []) + [{"kind": "thought",
-                         "text": "The forecast was computed by the tool - presenting its verified result directly."}]}
+        return {
+            "draft": direct,
+            "draft_ok": True,
+            "trace": state.get("trace", []) + [{
+                "kind": "thought",
+                "text": "The forecast was computed by the tool - presenting its verified result directly."
+            }]
+        }
+
     if state.get("route", "tools") == "tools" and not state.get("observations"):
-        # No tool ran, so there is nothing to report. Letting the LLM write anyway made it claim "the dataset has no data".
-        errs = [e["llm_error"] for e in state.get("trace", []) if e.get("llm_error")]
+        # No tool ran, so there is nothing to report.
+        errs = [
+            e["llm_error"]
+            for e in state.get("trace", [])
+            if e.get("llm_error")
+        ]
         why = _friendly_error(RuntimeError(errs[-1])) if errs else "no analysis tool could be run for this question"
-        return {"draft": f"⚠️ I couldn't run the analysis: {why}. No data was retrieved, so I won't guess - "
-                         "please try again in a few minutes.", "draft_ok": False}
-    charts = f"\nCharts created for the user: {len(state.get('charts', []))}" if state.get("charts") else ""
+
+        return {
+            "draft": (
+                f"⚠️ I couldn't run the analysis: {why}. "
+                "No data was retrieved, so I won't guess - "
+                "please try again in a few minutes."
+            ),
+            "draft_ok": False
+        }
+
+    charts = (
+        f"\nCharts created for the user: {len(state.get('charts', []))}"
+        if state.get("charts")
+        else ""
+    )
+
     try:
+        print(">>> SYNTHESIZER START", flush=True)
+
         resp = get_llm(0.2).invoke([
             SystemMessage(content=synthesizer_prompt()),
-            HumanMessage(content=f"Conversation so far:\n{_history(msgs[:-1])}\n\nQuestion: {_text(msgs[-1].content)}\n\n"
-                                 f"Plan: {state['plan'].get('reasoning', '')}\n\nTOOL OBSERVATIONS\n{_observation_block(state)}{charts}")])
+            HumanMessage(
+                content=(
+                    f"Conversation so far:\n{_history(msgs[:-1])}\n\n"
+                    f"Question: {_text(msgs[-1].content)}\n\n"
+                    f"Plan: {state['plan'].get('reasoning', '')}\n\n"
+                    f"TOOL OBSERVATIONS\n{_observation_block(state)}{charts}"
+                )
+            )
+        ])
+
+        print(">>> SYNTHESIZER FINISHED", flush=True)
+
         draft = _text(resp.content).strip()
+
         if draft:
-            return {"draft": draft, "draft_ok": True}
-        return {"draft": "The analysis completed, but the model returned no written response. Please try again.",
-                "draft_ok": False}
-    except Exception as e:  # noqa: BLE001
-        text = f"⚠️ I couldn't produce an answer: {_friendly_error(e)}. Please try again."
-        return {"draft": text, "draft_ok": False,
-                "trace": state.get("trace", []) + [{"kind": "thought", "text": "Final answer synthesis was unavailable.",
-                                                     "llm_error": f"{type(e).__name__}: {str(e)[:300]}"}]}
+            return {
+                "draft": draft,
+                "draft_ok": True
+            }
+
+        return {
+            "draft": (
+                "The analysis completed, but the model returned no written response. "
+                "Please try again."
+            ),
+            "draft_ok": False
+        }
+
+    except Exception as e:
+        text = (
+            f"⚠️ I couldn't produce an answer: "
+            f"{_friendly_error(e)}. Please try again."
+        )
+
+        return {
+            "draft": text,
+            "draft_ok": False,
+            "trace": state.get("trace", []) + [{
+                "kind": "thought",
+                "text": "Final answer synthesis was unavailable.",
+                "llm_error": f"{type(e).__name__}: {str(e)[:300]}"
+            }]
+        }
 
 
 def critic(state: AgentState) -> dict:
