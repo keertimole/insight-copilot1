@@ -68,9 +68,10 @@ def render_landing(badge: dict, examples: list[str], has_chat: bool = False) -> 
     # ---- hero
     st.markdown(
         '<div class="ic-hero"><div class="ic-eyebrow">AI DATA ANALYST</div>'
-        '<h1>Ask your sales data anything.<br><span>Get answers you can verify.</span></h1>'
-        '<div class="ic-sub">Insight Copilot is a reasoning agent for the Superstore Sales dataset. It plans its approach, '
-        'runs the analysis, and checks every figure before it answers.</div></div>', unsafe_allow_html=True)
+        '<h1>Ask questions. Explore the data.<br><span>Get clear, verifiable insights.</span></h1>'
+        '<div class="ic-sub">Insight Copilot is a LangGraph-powered reasoning agent for the Superstore Sales dataset. '
+        'It understands your question, creates a plan, selects the right analysis tools, and turns the results into '
+        'clear, verifiable insights.</div></div>', unsafe_allow_html=True)
     b1, b2, _ = st.columns([1.3, 1.3, 3])
     if b1.button("Start analyzing →", type="primary", key="land_start", width="stretch"):
         choice = "start"
