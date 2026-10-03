@@ -1,4 +1,5 @@
 """Streamlit chat UI for Insight Copilot. Run: streamlit run app.py"""
+"""Streamlit chat UI for Insight Copilot. Run: streamlit run app.py"""
 
 import json
 import re
@@ -36,13 +37,13 @@ st.set_page_config(
 st.markdown(
     """
     <style>
-    /* Keep the Streamlit chat bar centered while scrolling */
+    /* Keep the chat input centered inside the main content area */
     [data-testid="stBottom"] {
         position: fixed !important;
         bottom: 0 !important;
-        left: 0 !important;
+        left: var(--sidebar-width, 0px) !important;
         right: 0 !important;
-        width: 100% !important;
+        width: auto !important;
         display: flex !important;
         justify-content: center !important;
         align-items: center !important;
@@ -51,15 +52,15 @@ st.markdown(
     }
 
     [data-testid="stBottom"] [data-testid="stChatInput"] {
+        width: min(900px, calc(100vw - 4rem)) !important;
+        max-width: 900px !important;
+        margin: 0 auto !important;
         position: relative !important;
         left: auto !important;
         right: auto !important;
         bottom: auto !important;
         transform: none !important;
-        width: min(900px, calc(100vw - 2rem)) !important;
-        max-width: 900px !important;
-        margin: 0 auto !important;
-    }
+        }
 
     .main .block-container {
         padding-bottom: 7rem !important;
@@ -68,6 +69,7 @@ st.markdown(
     """,
     unsafe_allow_html=True,
 )
+
 
 HERO = (
     "Compare West and South sales, explain what is driving "
@@ -208,6 +210,7 @@ def render_summary(trace: list) -> None:
         ),
         None,
     )
+
     if not plan:
         return
 
@@ -313,6 +316,7 @@ def render_entry(e: dict) -> None:
                     for t in e["tools"]
                 )
             )
+
         elif e["route"] == "tools":
             st.caption(
                 "Tools planned: "
@@ -602,9 +606,7 @@ def render_metrics(slot) -> None:
                 f"p95 {m['p95_latency_s']}s"
             )
 
-            rate = m[
-                "self_check_pass_rate"
-            ]
+            rate = m["self_check_pass_rate"]
 
             st.markdown(
                 f"**Self-check pass rate:** "
@@ -707,7 +709,7 @@ with st.sidebar:
 
     st.markdown(
         f"**📊 Dataset:** "
-        f"{badge['name']}  \n"
+        f"{badge['name']}\n\n"
         f"{badge['rows']:,} rows · "
         f"{badge['start']}–{badge['end']}"
     )
@@ -1244,8 +1246,7 @@ if prompt:
 
         render_charts(
             charts,
-            key=f"live_"
-            f"{len(st.session_state.messages)}",
+            key=f"live_{len(st.session_state.messages)}",
         )
 
         # --------------------------------------------------------------
