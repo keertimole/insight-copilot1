@@ -1357,64 +1357,152 @@ with st.sidebar:
 
 
 # ------------------------------------------------------------------
-
 # landing
-
 # ------------------------------------------------------------------
+badge = dataset_badge()
 
 if st.session_state.show_landing:
-
     choice = render_landing(
-
         badge=badge,
-
         examples=EXAMPLES,
-
         has_chat=bool(
-
             st.session_state.messages
-
         ),
-
     )
 
     if choice is None:
-
         st.stop()
 
     if choice in (
-
         "start",
-
         "resume",
-
     ):
-
         st.session_state.show_landing = False
-
         st.rerun()
 
     if choice in EXAMPLES:
-
         st.session_state.pending = choice
-
         st.session_state.show_landing = False
-
         st.rerun()
 
 
-
 # ------------------------------------------------------------------
-
-# history
-
+# sidebar
 # ------------------------------------------------------------------
+df = load_df()
 
-st.header(
+with st.sidebar:
+    st.title(
+        "📊 Insight Copilot"
+    )
+    st.caption(
+        "A LangGraph reasoning agent for "
+        "exploring the Superstore Sales dataset."
+    )
 
-    "What would you like to analyze?"
+    if using_sample_data():
+        st.warning(
+            "Running on a **synthetic sample** "
+            "(data/train.csv not found). "
+            "Numbers are illustrative."
+        )
 
-)
+    st.markdown(
+        f"**📊 Dataset:** "
+        f"{badge['name']}  \n"
+        f"{badge['rows']:,} rows · "
+        f"{badge['start']}–{badge['end']}"
+    )
+
+    checks = validate_dataset()
+
+    with st.expander(
+        f"{'✅' if all(c['ok'] for c in checks) else '⚠️'} "
+        f"Data quality "
+        f"({sum(c['ok'] for c in checks)}/{len(checks)} checks)"
+    ):
+        for c in checks:
+            st.markdown(
+                f"{'✓' if c['ok'] else '✗'} "
+                f"**{c['check']}** — "
+                f"{c['detail']}"
+            )
+
+    st.markdown(
+        f"**Model:** "
+        f"`{provider()}` / "
+        f"`{model_name()}`"
+    )
+
+    if st.button(
+        "🗑️ New conversation (clears memory)",
+        width="stretch",
+    ):
+        reset_chat()
+        st.session_state.show_landing = True
+        st.rerun()
+
+    st.caption(
+        "🧠 The agent remembers this conversation, "
+        "so follow-ups like “and for Central?” work. "
+        "Refreshing the page keeps it (text only)."
+    )
+
+    metrics_slot = st.empty()
+
+    render_metrics(
+        metrics_slot
+    )
+
+    st.divider()
+
+    st.markdown(
+        "**💡 Pick a question** "
+        "(or type your own in the box below)"
+    )
+
+    group = st.selectbox(
+        "Question type",
+        list(QUESTION_GROUPS),
+        key="q_group",
+        label_visibility="collapsed",
+    )
+
+    for q in QUESTION_GROUPS[group]:
+        if st.button(
+            q,
+            key=f"ex_{q}",
+            width="stretch",
+        ):
+            st.session_state.pending = q
+
+    st.toggle(
+        "🧠 Open reasoning panel automatically",
+        key="auto_reason",
+        value=False,
+    )
+
+    st.caption(
+        f"Dates are relative to the dataset "
+        f"(latest order: "
+        f"{df['Order Date'].max():%b %Y}), "
+        "not today's date - so 'last quarter' "
+        "and 'next 6 months' follow the data."
+    )
+
+    st.divider()
+
+    st.caption(
+        "First load after inactivity can take "
+        "~30s (free-tier hosting wakes up from sleep)."
+    )
+    
+    # ------------------------------------------------------------------
+    # # history
+    # # ------------------------------------------------------------------
+    st.header(
+        "What would you like to analyze?"
+        )
 
 if not st.session_state.messages:
 
