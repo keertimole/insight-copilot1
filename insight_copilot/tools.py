@@ -167,7 +167,7 @@ def web_search(**kw) -> str:
         try:
             from ddgs import DDGS
         except ImportError:
-            from duckduckgo_search import DDGS
+            from ddgs import DDGS
         hits = list(DDGS().text(a.query, max_results=max(1, min(a.max_results, 6))))
         if not hits:
             return "No web results found."
