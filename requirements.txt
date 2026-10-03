@@ -12,9 +12,9 @@ python-dotenv>=1.0
 pytest>=8.0
 
 # Optional: durable conversation memory (set CHECKPOINT_DB):
-# langgraph-checkpoint-sqlite
+langgraph-checkpoint-sqlite
 
 # Optional providers (uncomment the one you use):
 langchain-google-genai
-# langchain-openai
-# langchain-anthropic
+langchain-openai
+langchain-anthropic
