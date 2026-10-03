@@ -59,40 +59,38 @@ st.set_page_config(
 )
 
 st.markdown(
-
     """
-
     <style>
-
-    [data-testid="stChatInput"] {
-
+    [data-testid="stBottom"] {
         position: fixed !important;
-
-        bottom: 1rem !important;
-
-        left: 50% !important;
-
-        transform: translateX(-50%) !important;
-
-        width: min(900px, calc(100vw - 2rem)) !important;
-
+        bottom: 0 !important;
+        left: 0 !important;
+        right: 0 !important;
+        width: 100% !important;
+        display: flex !important;
+        justify-content: center !important;
+        align-items: center !important;
+        padding: 0 1rem 1rem 1rem !important;
         z-index: 999999 !important;
-
     }
 
-    .main .block-container {
-
-        padding-bottom: 7rem !important;
-
-    }
-
-    </style>
-
-    """,
-
+    [data-testid="stBottom"] [data-testid="stChatInput"] {
+        position: relative !important;
+        left: auto !important;
+        right: auto !important;
+        bottom: auto !important;
+        transform: none !important;
+        width: min(900px, calc(100vw - 2rem)) !important;
+        max-width: 900px !important;
+        margin: 0 auto !important;
+        }
+        .main .block-container {
+            padding-bottom: 7rem !important;
+            }
+            </style>
+            """,
     unsafe_allow_html=True,
-
-)
+    )
 
 HERO = (
 
